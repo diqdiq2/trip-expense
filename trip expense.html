@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>국외출장 여비 자동 계산 시스템</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Noto Sans KR',sans-serif;background:#f0f4f8;min-height:100vh;padding-bottom:60px;}
+  input[type=number]::-webkit-inner-spin-button{opacity:1;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState} = React;
+
+// ── 직급 분류표 ───────────────────────────────────────────
+const RANK_MAP = {
+  "장관":"제1호 가목","대장":"제1호 가목",
+  "청장":"제1호 나목","중장":"제1호 나목",
+  "차장":"제1호 다목","소장":"제1호 다목","준장":"제1호 다목","1급":"제1호 다목",
+  "부장":"제1호 라목","단장":"제1호 라목","국장":"제1호 라목","대령":"제1호 라목","중령":"제1호 라목","2급":"제1호 라목",
+  "3급":"제2호","4급":"제2호","5급":"제2호","6급":"제2호","7급":"제2호","8급":"제2호","9급":"제2호",
+  "소령":"제2호","대위":"제2호","중위":"제2호","소위":"제2호","준위":"제2호",
+  "원사":"제2호","상사":"제2호","중사":"제2호","하사":"제2호","일반직원":"제2호",
+};
+
+function getRankGroup(rank) {
+  if (!rank) return null;
+  const t = rank.trim();
+  if (RANK_MAP[t]) return RANK_MAP[t];
+  for (const [k,g] of Object.entries(RANK_MAP)) {
+    if (t.includes(k)||k.includes(t)) return g;
+  }
+  return null;
+}
+
+// ── 국가등급표 ────────────────────────────────────────────
+const COUNTRY_GRADE = {
+  "미국":"가","일본":"가","영국":"가","스위스":"가","노르웨이":"가","덴마크":"가",
+  "스웨덴":"가","싱가포르":"가","호주":"가","뉴질랜드":"가","캐나다":"가","홍콩":"가",
+  "도쿄":"가","뉴욕":"가","런던":"가","파리":"가","시드니":"가",
+  "독일":"나","프랑스":"나","오스트리아":"나","벨기에":"나","네덜란드":"나",
+  "핀란드":"나","이탈리아":"나","스페인":"나","아일랜드":"나","이스라엘":"나",
+  "카타르":"나","UAE":"나","쿠웨이트":"나","사우디아라비아":"나","브라질":"나",
+  "베를린":"나","프랑크푸르트":"나","빈":"나","브뤼셀":"나","암스테르담":"나",
+  "로마":"나","마드리드":"나","두바이":"나","상파울루":"나",
+  "중국":"다","러시아":"다","멕시코":"다","터키":"다","남아프리카공화국":"다",
+  "이집트":"다","인도":"다","말레이시아":"다","태국":"다","인도네시아":"다",
+  "필리핀":"다","대만":"다","체코":"다","폴란드":"다","헝가리":"다","그리스":"다","포르투갈":"다",
+  "베이징":"다","상하이":"다","모스크바":"다","방콕":"다","쿠알라룸푸르":"다",
+  "자카르타":"다","마닐라":"다","타이베이":"다","프라하":"다","바르샤바":"다",
+  "베트남":"라","캄보디아":"라","라오스":"라","미얀마":"라","방글라데시":"라",
+  "파키스탄":"라","스리랑카":"라","네팔":"라","몽골":"라","우즈베키스탄":"라",
+  "카자흐스탄":"라","이란":"라","이라크":"라","케냐":"라","나이지리아":"라",
+  "하노이":"라","호치민":"라","프놈펜":"라","양곤":"라","카트만두":"라","울란바토르":"라",
+};
+const GRADE_LABEL = {"가":"가등급","나":"나등급","다":"다등급","라":"라등급"};
+
+function getGrade(input) {
+  if (!input) return null;
+  const k = input.trim();
+  if (COUNTRY_GRADE[k]) return COUNTRY_GRADE[k];
+  for (const [key,g] of Object.entries(COUNTRY_GRADE)) {
+    if (k.includes(key)||key.includes(k)) return g;
+  }
+  return null;
+}
+
+// ── 별표4 단가표 (USD) ────────────────────────────────────
+const RATES = {
+  "제1호 가목":{가:{daily:60,lodge:471,meal:186},나:{daily:60,lodge:422,meal:136},다:{daily:60,lodge:271,meal:102},라:{daily:60,lodge:216,meal:85}},
+  "제1호 나목":{가:{daily:50,lodge:389,meal:160},나:{daily:50,lodge:289,meal:117},다:{daily:50,lodge:215,meal:87},라:{daily:50,lodge:161,meal:73}},
+  "제1호 다목":{가:{daily:40,lodge:282,meal:133},나:{daily:40,lodge:207,meal:99},다:{daily:40,lodge:156,meal:75},라:{daily:40,lodge:116,meal:63}},
+  "제1호 라목":{가:{daily:35,lodge:223,meal:107},나:{daily:35,lodge:160,meal:78},다:{daily:35,lodge:130,meal:58},라:{daily:35,lodge:85,meal:49}},
+  "제2호":     {가:{daily:30,lodge:176,meal:81}, 나:{daily:30,lodge:137,meal:59},다:{daily:30,lodge:106,meal:44},라:{daily:30,lodge:81,meal:37}},
+};
+
+// ── 참고 이미지 ───────────────────────────────────────────
+const REF_IMAGES = [
+  {key:"b1",  label:"별표 1 — 여비지급구분표",       url:"https://github.com/yeong-5/-/blob/2526ea71b2c199d188eae633eb2834bb0527011d/table1.png?raw=true"},
+  {key:"b4a", label:"별표 4 — 국외여비 지급표 (1)", url:"https://github.com/yeong-5/-/blob/2526ea71b2c199d188eae633eb2834bb0527011d/table2.png?raw=true"},
+  {key:"b4b", label:"별표 4 — 국외여비 지급표 (2)", url:"https://github.com/yeong-5/-/blob/2526ea71b2c199d188eae633eb2834bb0527011d/table3.png?raw=true"},
+];
+
+// ── 유틸 ─────────────────────────────────────────────────
+function dateRange(start, end) {
+  const dates=[], cur=new Date(start), last=new Date(end);
+  while(cur<=last){dates.push(cur.toISOString().slice(0,10));cur.setDate(cur.getDate()+1);}
+  return dates;
+}
+const fmt  = n => Math.round(n).toLocaleString("ko-KR");
+const fmtU = n => Number(n).toFixed(2);
+const uid  = () => Date.now()+Math.random();
+
+// ── 스타일 ───────────────────────────────────────────────
+const S = {
+  card:   {background:"#fff",borderRadius:12,padding:20,marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,.08)"},
+  sec:    {fontSize:15,fontWeight:700,color:"#1e3a5f",marginBottom:12},
+  sub:    {fontSize:13,fontWeight:600,color:"#374151",marginBottom:6,marginTop:8},
+  g2:     {display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px 16px"},
+  lbl:    {display:"flex",flexDirection:"column",gap:4,fontSize:13,color:"#374151",fontWeight:600},
+  inp:    {border:"1.5px solid #d1d5db",borderRadius:7,padding:"8px 10px",fontSize:14,outline:"none",width:"100%",boxSizing:"border-box"},
+  btn:    {border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontWeight:600,fontSize:14},
+  th:     {padding:"8px 10px",textAlign:"left",fontWeight:600,fontSize:13,borderBottom:"1px solid #e5e7eb"},
+  td:     {padding:"7px 10px",borderBottom:"1px solid #f3f4f6",fontSize:13},
+};
+
+// ── 컴포넌트 ─────────────────────────────────────────────
+function App() {
+  const [country,setCountry]   = useState("");
+  const [city,setCity]         = useState("");
+  const [startDate,setStart]   = useState("");
+  const [endDate,setEnd]       = useState("");
+  const [nights,setNights]     = useState("");
+  const [days,setDays]         = useState("");
+  const [rate,setRate]         = useState("");
+  const [travelers,setTravelers]= useState([newT()]);
+  const [results,setResults]   = useState(null);
+  const [errors,setErrors]     = useState([]);
+  const [modal,setModal]       = useState(null);
+
+  function newT(){return{id:uid(),name:"",rank:"",discount:false,reserve:"",airfare:"",dayAdj:{}};}
+
+  const dates = (startDate&&endDate&&startDate<=endDate)?dateRange(startDate,endDate):[];
+
+  const updT=(id,f,v)=>setTravelers(ts=>ts.map(t=>t.id===id?{...t,[f]:v}:t));
+  const updAdj=(id,d,f,v)=>setTravelers(ts=>ts.map(t=>t.id!==id?t:{...t,dayAdj:{...t.dayAdj,[d]:{...(t.dayAdj[d]||{}),[f]:v}}}));
+  const addT=()=>{const nt=newT();const last=travelers[travelers.length-1];if(last)nt.dayAdj=JSON.parse(JSON.stringify(last.dayAdj));setTravelers(ts=>[...ts,nt]);};
+  const copyPrev=(id)=>{const idx=travelers.findIndex(t=>t.id===id);if(idx<1)return;const prev=travelers[idx-1];setTravelers(ts=>ts.map(t=>t.id===id?{...t,dayAdj:JSON.parse(JSON.stringify(prev.dayAdj))}:t));};
+
+  function calculate(){
+    const errs=[];
+    if(!country&&!city)errs.push("출장 국가 또는 도시를 입력하세요.");
+    if(!startDate)errs.push("출장 시작일을 입력하세요.");
+    if(!endDate)errs.push("출장 종료일을 입력하세요.");
+    if(startDate&&endDate&&startDate>endDate)errs.push("시작일이 종료일보다 늦습니다.");
+    if(!nights||isNaN(parseInt(nights)))errs.push("박수를 입력하세요.");
+    if(!days||isNaN(parseInt(days)))errs.push("일수를 입력하세요.");
+    if(!rate||isNaN(Number(rate)))errs.push("환율을 올바르게 입력하세요.");
+    const loc=city||country;
+    const grade=getGrade(loc);
+    if(!grade)errs.push(`"${loc}"의 국가등급을 찾을 수 없습니다.`);
+    travelers.forEach((t,i)=>{
+      if(!t.rank)errs.push(`출장자 ${i+1}: 직급을 입력하세요.`);
+      else if(!getRankGroup(t.rank))errs.push(`출장자 ${i+1}: "${t.rank}" 직급을 분류할 수 없습니다.`);
+    });
+    if(errs.length){setErrors(errs);setResults(null);return;}
+    setErrors([]);
+    const exRate=Number(rate), n=parseInt(nights), d=parseInt(days);
+    const res=travelers.map((t,ti)=>{
+      const rg=getRankGroup(t.rank);
+      const base=RATES[rg][grade];
+      const discLodge=t.discount?base.lodge*0.8:base.lodge;
+      let totalD=0,totalM=0;
+      const dayDetails=dates.map((dt,di)=>{
+        const adj=t.dayAdj[dt]||{};
+        const di2=adj.rental?base.daily*0.5:base.daily;
+        const mi=adj.meal?base.meal*0.7:base.meal;
+        totalD+=di2;totalM+=mi;
+        return{date:dt,rental:!!adj.rental,mealAdj:!!adj.meal,daily:di2,meal:mi};
+      });
+      const lodgeUSD=discLodge*n;
+      const totalUSD=totalD+totalM+lodgeUSD;
+      const tripKRW=totalUSD*exRate;
+      const reserve=Number(t.reserve)||0;
+      const airfare=Number(t.airfare)||0;
+      const totalKRW=tripKRW+reserve+airfare;
+      return{name:t.name||`출장자${ti+1}`,rank:t.rank,rankGroup:rg,grade:GRADE_LABEL[grade],
+        base,discLodge,discount:t.discount,dayDetails,nights:n,totalDays:d,
+        totalDailyUSD:totalD,totalMealUSD:totalM,lodgeUSD,totalUSD,
+        exRate,tripKRW,reserve,airfare,totalKRW};
+    });
+    setResults({loc,grade:GRADE_LABEL[grade],exRate,dates,nights:n,totalDays:d,res});
+  }
+
+  function downloadCSV(){
+    if(!results)return;
+    const {loc,grade,exRate,nights:n,totalDays:d,res}=results;
+    const q=v=>`"${String(v).replace(/"/g,'""')}"`;
+    const rows=[];
+    rows.push([q("국외출장 여비 계산 결과")]);
+    rows.push([q(`출장지: ${loc} (${grade})`),q(`환율: 1 USD = ${Number(exRate).toLocaleString()}원`),q(`${n}박 ${d}일`)]);
+    rows.push([]);
+    res.forEach(r=>{
+      rows.push([q(`▶ ${r.name} / ${r.rank} / ${r.rankGroup} / ${r.grade}`)]);
+      rows.push([q("항목"),q("기본단가(USD)"),q("적용단가(USD)"),q("비고")]);
+      rows.push([q("일비"),q(r.base.daily),q(r.base.daily),q("")]);
+      rows.push([q("식비"),q(r.base.meal),q(r.base.meal),q("")]);
+      rows.push([q("숙박비"),q(r.base.lodge),q(r.discLodge.toFixed(2)),q(r.discount?"할인정액 80%":"")]);
+      rows.push([]);
+      rows.push([q("날짜"),q("구분"),q("렌터카"),q("기내식"),q("일비(USD)"),q("식비(USD)")]);
+      r.dayDetails.forEach((dt,i)=>{
+        const tag=i===0?"출발일":i===r.dayDetails.length-1?"도착일":`${i+1}일차`;
+        rows.push([q(dt.date),q(tag),q(dt.rental?"O":""),q(dt.mealAdj?"O":""),q(dt.daily.toFixed(2)),q(dt.meal.toFixed(2))]);
+      });
+      rows.push([]);
+      rows.push([q("일비 합계(USD)"),q(r.totalDailyUSD.toFixed(2))]);
+      rows.push([q("식비 합계(USD)"),q(r.totalMealUSD.toFixed(2))]);
+      rows.push([q(`숙박비(${r.discLodge.toFixed(2)}×${r.nights}박)`),q(r.lodgeUSD.toFixed(2))]);
+      rows.push([q("USD 총계"),q(r.totalUSD.toFixed(2))]);
+      rows.push([q(`원화 환산(×${Number(r.exRate).toLocaleString()}원)`),q(fmt(r.tripKRW))]);
+      if(r.reserve>0)rows.push([q("준비금(원)"),q(fmt(r.reserve))]);
+      if(r.airfare>0)rows.push([q("항공권(원)"),q(fmt(r.airfare))]);
+      rows.push([q("최종 지급액(원)"),q(fmt(r.totalKRW))]);
+      rows.push([]);
+    });
+    const grand=res.reduce((s,r)=>s+r.totalKRW,0);
+    rows.push([q("▶ 전체 합계"),q(""),q(""),q("")]);
+    rows.push([q("출장자"),q("직급"),q("직급군"),q("금액(원)")]);
+    res.forEach(r=>rows.push([q(r.name),q(r.rank),q(r.rankGroup),q(fmt(r.totalKRW))]));
+    rows.push([q("총 합계"),q(""),q(""),q(fmt(grand))]);
+    const csv="\uFEFF"+rows.map(r=>r.join(",")).join("\n");
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download=`국외출장여비_${results.loc}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div style={{fontFamily:"'Noto Sans KR',sans-serif",background:"#f0f4f8",minHeight:"100vh",paddingBottom:60}}>
+      {/* 헤더 */}
+      <div style={{background:"#1e3a5f",color:"#fff",padding:"20px 28px"}}>
+        <div style={{fontSize:20,fontWeight:700}}>🌏 국외출장 여비 자동 계산 시스템</div>
+        <div style={{fontSize:12,marginTop:4,opacity:.8}}>공무원 여비 규정 별표 4 기준</div>
+      </div>
+
+      <div style={{maxWidth:880,margin:"24px auto",padding:"0 16px"}}>
+
+        {/* 참고 링크 */}
+        <div style={S.card}>
+          <div style={S.sec}>📎 참고 링크</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
+            {[["하나은행 현재환율","https://www.kebhana.com/cont/mall/mall15/mall1501/index.jsp"],
+              ["Skyscanner 항공권 비교","https://www.skyscanner.co.kr/"]
+            ].map(([label,url])=>(
+              <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                style={{background:"#e8f0fe",color:"#1a56db",padding:"5px 12px",borderRadius:6,fontSize:13,textDecoration:"none"}}>
+                🔗 {label}
+              </a>
+            ))}
+          </div>
+          <div style={{marginTop:14,borderTop:"1px solid #e5e7eb",paddingTop:14}}>
+            <div style={{fontSize:13,fontWeight:600,color:"#374151",marginBottom:10}}>📄 공무원 여비 규정 별표</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
+              {REF_IMAGES.map(({key,label})=>(
+                <button key={key} onClick={()=>setModal(key)}
+                  style={{...S.btn,background:"#f0fdf4",color:"#166534",border:"1.5px solid #86efac",fontSize:13,padding:"6px 14px"}}>
+                  🔍 {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 공통 정보 */}
+        <div style={S.card}>
+          <div style={S.sec}>📋 출장 공통 정보</div>
+          <div style={S.g2}>
+            <label style={S.lbl}>출장 국가 *
+              <input style={S.inp} value={country} onChange={e=>setCountry(e.target.value)} placeholder="예: 미국, 일본"/>
+            </label>
+            <label style={S.lbl}>출장 도시 <span style={{fontWeight:400,color:"#888",fontSize:11}}>(입력 시 우선 적용)</span>
+              <input style={S.inp} value={city} onChange={e=>setCity(e.target.value)} placeholder="예: 도쿄, 뉴욕"/>
+            </label>
+            <label style={S.lbl}>출장 시작일 *
+              <input type="date" style={S.inp} value={startDate} onChange={e=>setStart(e.target.value)}/>
+            </label>
+            <label style={S.lbl}>출장 종료일 *
+              <input type="date" style={S.inp} value={endDate} onChange={e=>setEnd(e.target.value)}/>
+            </label>
+          </div>
+          <div style={{...S.g2,marginTop:12}}>
+            <label style={S.lbl}>박수 * <span style={{fontWeight:400,color:"#888",fontSize:11}}>(시차 고려하여 직접 입력)</span>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <input style={{...S.inp,width:100}} type="number" min="0" value={nights} onChange={e=>setNights(e.target.value)} placeholder="예: 3"/>
+                <span>박</span>
+              </div>
+            </label>
+            <label style={S.lbl}>일수 * <span style={{fontWeight:400,color:"#888",fontSize:11}}>(시차 고려하여 직접 입력)</span>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <input style={{...S.inp,width:100}} type="number" min="1" value={days} onChange={e=>setDays(e.target.value)} placeholder="예: 5"/>
+                <span>일</span>
+              </div>
+            </label>
+          </div>
+          {startDate&&endDate&&nights&&days&&(
+            <div style={{marginTop:10,padding:"8px 14px",background:"#e8f4fd",borderRadius:8,fontSize:14,color:"#1a56db",fontWeight:600}}>
+              📅 {startDate} ~ {endDate} ({nights}박 {days}일)
+            </div>
+          )}
+          <div style={{marginTop:12}}>
+            <label style={S.lbl}>환율 (1 USD = ? 원) *
+              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <input style={{...S.inp,width:180}} value={rate} onChange={e=>setRate(e.target.value)} placeholder="예: 1420"/>
+                <span style={{fontSize:13,color:"#555"}}>원 / USD</span>
+                <a href="https://www.kebhana.com/cont/mall/mall15/mall1501/index.jsp" target="_blank" rel="noopener noreferrer"
+                  style={{fontSize:12,color:"#1a56db"}}>하나은행 현재환율 확인 →</a>
+              </div>
+              <div style={{fontSize:12,color:"#888",marginTop:3}}>하나은행 현찰 살 때 기준 환율을 입력하세요.</div>
+            </label>
+          </div>
+        </div>
+
+        {/* 출장자 */}
+        {travelers.map((t,idx)=>(
+          <TravelerCard key={t.id} t={t} idx={idx} dates={dates}
+            onUpdate={updT} onDayAdj={updAdj}
+            onRemove={travelers.length>1?()=>setTravelers(ts=>ts.filter(x=>x.id!==t.id)):null}
+            onCopyPrev={idx>0?()=>copyPrev(t.id):null}/>
+        ))}
+
+        <button onClick={addT}
+          style={{...S.btn,background:"#e8f4fd",color:"#1a56db",border:"1.5px dashed #1a56db",width:"100%",marginBottom:16}}>
+          + 출장자 추가
+        </button>
+
+        {errors.length>0&&(
+          <div style={{background:"#fff3cd",border:"1px solid #ffc107",borderRadius:8,padding:"12px 16px",marginBottom:16}}>
+            {errors.map((e,i)=><div key={i} style={{color:"#856404",fontSize:13}}>⚠️ {e}</div>)}
+          </div>
+        )}
+
+        <button onClick={calculate}
+          style={{...S.btn,background:"#1e3a5f",color:"#fff",width:"100%",fontSize:16,padding:14,borderRadius:10}}>
+          🧮 여비 계산하기
+        </button>
+
+        {results&&<Results results={results} onDownload={downloadCSV}/>}
+      </div>
+
+      {/* 이미지 모달 */}
+      {modal&&(()=>{
+        const img=REF_IMAGES.find(r=>r.key===modal);
+        return(
+          <div onClick={()=>setModal(null)}
+            style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:1000,
+              display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+            <div onClick={e=>e.stopPropagation()}
+              style={{background:"#fff",borderRadius:12,padding:16,maxWidth:"92vw",maxHeight:"92vh",
+                display:"flex",flexDirection:"column",gap:10,overflowY:"auto"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontWeight:700,fontSize:14}}>{img.label}</span>
+                <button onClick={()=>setModal(null)}
+                  style={{...S.btn,background:"#f3f4f6",color:"#111",padding:"4px 12px",fontSize:13}}>✕ 닫기</button>
+              </div>
+              <img src={img.url} alt={img.label}
+                style={{maxWidth:"85vw",objectFit:"contain",borderRadius:8}}
+                onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
+              <div style={{display:"none",color:"#dc2626",fontSize:13}}>
+                이미지를 불러올 수 없습니다. GitHub 저장소가 Public인지 확인하세요.
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+function TravelerCard({t,idx,dates,onUpdate,onDayAdj,onRemove,onCopyPrev}){
+  const id=t.id;
+  const rg=getRankGroup(t.rank);
+  return(
+    <div style={{...S.card,borderLeft:"4px solid #1e3a5f"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{...S.sec,marginBottom:0}}>👤 출장자 {idx+1}</div>
+        <div style={{display:"flex",gap:8}}>
+          {onCopyPrev&&<button onClick={onCopyPrev}
+            style={{...S.btn,background:"#f0f0f0",color:"#333",fontSize:12,padding:"4px 10px"}}>위와 동일 조정 복사</button>}
+          {onRemove&&<button onClick={onRemove}
+            style={{...S.btn,background:"#fee2e2",color:"#b91c1c",fontSize:12,padding:"4px 10px"}}>삭제</button>}
+        </div>
+      </div>
+      <div style={S.g2}>
+        <label style={S.lbl}>이름 (선택)
+          <input style={S.inp} value={t.name} onChange={e=>onUpdate(id,"name",e.target.value)} placeholder="예: 홍길동"/>
+        </label>
+        <label style={S.lbl}>직급 *
+          <input style={S.inp} value={t.rank} onChange={e=>onUpdate(id,"rank",e.target.value)} placeholder="예: 준장, 4급, 소령, 부장"/>
+          {t.rank&&<div style={{fontSize:11,marginTop:2,color:rg?"#059669":"#dc2626"}}>→ {rg||"직급 분류 불가 — 확인 필요"}</div>}
+        </label>
+        <label style={S.lbl}>준비금 (원, 선택)
+          <input style={S.inp} type="number" value={t.reserve} onChange={e=>onUpdate(id,"reserve",e.target.value)} placeholder="0"/>
+        </label>
+        <label style={S.lbl}>항공권 금액 (원, 선택)
+          <input style={S.inp} type="number" value={t.airfare} onChange={e=>onUpdate(id,"airfare",e.target.value)} placeholder="0"/>
+        </label>
+      </div>
+      <label style={{display:"flex",alignItems:"center",gap:8,margin:"10px 0",cursor:"pointer",fontSize:14}}>
+        <input type="checkbox" checked={t.discount} onChange={e=>onUpdate(id,"discount",e.target.checked)}
+          style={{width:16,height:16,accentColor:"#1e3a5f"}}/>
+        <span>할인정액 적용 (숙박비 80% 지급)</span>
+      </label>
+      {dates.length>0&&(
+        <div style={{marginTop:8}}>
+          <div style={{fontSize:13,fontWeight:600,color:"#374151",marginBottom:6}}>
+            날짜별 조정 <span style={{fontWeight:400,color:"#888",fontSize:11}}>(렌터카·기내식 해당 날짜 체크)</span>
+          </div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+              <thead>
+                <tr style={{background:"#f1f5f9"}}>
+                  <th style={S.th}>날짜</th><th style={S.th}>구분</th>
+                  <th style={S.th}>렌터카<br/><span style={{fontWeight:400,fontSize:11}}>(일비 50%)</span></th>
+                  <th style={S.th}>기내식<br/><span style={{fontWeight:400,fontSize:11}}>(식비 70%)</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {dates.map((d,di)=>{
+                  const adj=t.dayAdj[d]||{};
+                  const tag=di===0?"출발일":di===dates.length-1?"도착일":`${di+1}일차`;
+                  return(
+                    <tr key={d} style={{background:di%2===0?"#fff":"#f9fafb"}}>
+                      <td style={S.td}>{d}</td>
+                      <td style={S.td}><span style={{background:"#e0f2fe",color:"#0369a1",padding:"2px 8px",borderRadius:12,fontSize:11}}>{tag}</span></td>
+                      <td style={{...S.td,textAlign:"center"}}>
+                        <input type="checkbox" checked={!!adj.rental} onChange={e=>onDayAdj(id,d,"rental",e.target.checked)} style={{width:16,height:16,accentColor:"#1e3a5f"}}/>
+                      </td>
+                      <td style={{...S.td,textAlign:"center"}}>
+                        <input type="checkbox" checked={!!adj.meal} onChange={e=>onDayAdj(id,d,"meal",e.target.checked)} style={{width:16,height:16,accentColor:"#1e3a5f"}}/>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Results({results,onDownload}){
+  const {loc,grade,exRate,nights,totalDays,res}=results;
+  const grand=res.reduce((s,r)=>s+r.totalKRW,0);
+  return(
+    <div style={{marginTop:24}}>
+      <div style={{...S.card,background:"#1e3a5f",color:"#fff"}}>
+        <div style={{fontSize:18,fontWeight:700}}>📊 계산 결과</div>
+        <div style={{fontSize:13,marginTop:4,opacity:.8}}>{loc} · {grade} · 1 USD = {Number(exRate).toLocaleString()}원 · {nights}박 {totalDays}일</div>
+      </div>
+      {res.map((r,i)=><PersonResult key={i} r={r}/>)}
+      <div style={S.card}>
+        <div style={S.sec}>💰 전체 합계</div>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}>
+          <thead><tr style={{background:"#f1f5f9"}}>
+            <th style={S.th}>출장자</th><th style={S.th}>직급</th><th style={{...S.th,textAlign:"right"}}>금액(원)</th>
+          </tr></thead>
+          <tbody>
+            {res.map((r,i)=>(
+              <tr key={i} style={{background:i%2===0?"#fff":"#f9fafb"}}>
+                <td style={S.td}>{r.name}</td>
+                <td style={S.td}>{r.rank} ({r.rankGroup})</td>
+                <td style={{...S.td,textAlign:"right",fontWeight:600}}>{fmt(r.totalKRW)}원</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr style={{background:"#1e3a5f",color:"#fff"}}>
+              <td style={{...S.td,fontWeight:700}} colSpan={2}>총 합계</td>
+              <td style={{...S.td,textAlign:"right",fontWeight:700,fontSize:16}}>{fmt(grand)}원</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <button onClick={onDownload}
+        style={{...S.btn,background:"#059669",color:"#fff",width:"100%",fontSize:15,padding:13,borderRadius:10,marginTop:8}}>
+        📥 Excel(CSV)로 다운로드
+      </button>
+      <button onClick={()=>window.print()}
+        style={{...S.btn,background:"#6366f1",color:"#fff",width:"100%",fontSize:15,padding:13,borderRadius:10,marginTop:8}}>
+        🖨️ 인쇄 / PDF 저장
+      </button>
+    </div>
+  );
+}
+
+function PersonResult({r}){
+  const [open,setOpen]=useState(true);
+  return(
+    <div style={S.card}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>setOpen(o=>!o)}>
+        <div>
+          <span style={{fontSize:15,fontWeight:700}}>{r.name}</span>
+          <span style={{fontSize:13,color:"#555",marginLeft:8}}>{r.rank} · {r.rankGroup} · {r.grade}</span>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <span style={{fontSize:17,fontWeight:700,color:"#1e3a5f"}}>{fmt(r.totalKRW)}원</span>
+          <span style={{color:"#888"}}>{open?"▲":"▼"}</span>
+        </div>
+      </div>
+      {open&&(
+        <div style={{marginTop:14}}>
+          <div style={S.sub}>기본 단가 (USD)</div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13,marginBottom:12}}>
+            <thead><tr style={{background:"#f1f5f9"}}>
+              <th style={S.th}>항목</th><th style={{...S.th,textAlign:"right"}}>기본</th><th style={{...S.th,textAlign:"right"}}>적용</th>
+            </tr></thead>
+            <tbody>
+              {[["일비",r.base.daily,r.base.daily,""],["식비",r.base.meal,r.base.meal,""],
+                ["숙박비",r.base.lodge,r.discLodge,r.discount?"(할인정액 80%)":""]
+              ].map(([l,b,a,note],i)=>(
+                <tr key={l} style={{background:i%2===0?"#fff":"#f9fafb"}}>
+                  <td style={S.td}>{l}</td>
+                  <td style={{...S.td,textAlign:"right"}}>${fmtU(b)}</td>
+                  <td style={{...S.td,textAlign:"right"}}>${fmtU(a)} {note&&<span style={{fontSize:11,color:"#d97706"}}>{note}</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={S.sub}>날짜별 계산 내역</div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,marginBottom:12}}>
+              <thead><tr style={{background:"#f1f5f9"}}>
+                <th style={S.th}>날짜</th><th style={S.th}>렌터카</th><th style={S.th}>기내식</th>
+                <th style={{...S.th,textAlign:"right"}}>일비(USD)</th><th style={{...S.th,textAlign:"right"}}>식비(USD)</th>
+              </tr></thead>
+              <tbody>
+                {r.dayDetails.map((d,i)=>(
+                  <tr key={d.date} style={{background:i%2===0?"#fff":"#f9fafb"}}>
+                    <td style={S.td}>{d.date}</td>
+                    <td style={{...S.td,textAlign:"center"}}>{d.rental?"✅":"-"}</td>
+                    <td style={{...S.td,textAlign:"center"}}>{d.mealAdj?"✅":"-"}</td>
+                    <td style={{...S.td,textAlign:"right"}}>${fmtU(d.daily)}{d.rental&&<span style={{color:"#d97706",fontSize:10}}> (50%)</span>}</td>
+                    <td style={{...S.td,textAlign:"right"}}>${fmtU(d.meal)}{d.mealAdj&&<span style={{color:"#d97706",fontSize:10}}> (70%)</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={S.sub}>합산 및 원화 환산</div>
+          <div style={{background:"#f8fafc",borderRadius:8,padding:"12px 14px",fontSize:13}}>
+            <Row l="일비 합계" v={`$${fmtU(r.totalDailyUSD)}`}/>
+            <Row l="식비 합계" v={`$${fmtU(r.totalMealUSD)}`}/>
+            <Row l={`숙박비 합계 ($${fmtU(r.discLodge)} × ${r.nights}박)`} v={`$${fmtU(r.lodgeUSD)}`}/>
+            <div style={{borderTop:"1px solid #cbd5e1",margin:"6px 0"}}/>
+            <Row l="USD 총계" v={`$${fmtU(r.totalUSD)}`} bold/>
+            <Row l={`× 환율 ${Number(r.exRate).toLocaleString()}원`} v={`${fmt(r.tripKRW)}원`} bold/>
+            {r.reserve>0&&<Row l="+ 준비금" v={`${fmt(r.reserve)}원`}/>}
+            {r.airfare>0&&<Row l="+ 항공권" v={`${fmt(r.airfare)}원`}/>}
+            <div style={{borderTop:"2px solid #1e3a5f",margin:"6px 0"}}/>
+            <Row l="최종 지급액" v={`${fmt(r.totalKRW)}원`} bold large/>
+          </div>
+          <div style={{marginTop:10,padding:"8px 12px",background:"#fffbeb",borderRadius:8,fontSize:12,color:"#92400e",lineHeight:1.9}}>
+            <strong>계산식:</strong><br/>
+            일비: {r.dayDetails.map(d=>`$${fmtU(d.daily)}`).join("+")} = ${fmtU(r.totalDailyUSD)}<br/>
+            식비: {r.dayDetails.map(d=>`$${fmtU(d.meal)}`).join("+")} = ${fmtU(r.totalMealUSD)}<br/>
+            숙박비: ${fmtU(r.discLodge)} × {r.nights}박 = ${fmtU(r.lodgeUSD)}<br/>
+            합계: ${fmtU(r.totalUSD)} × {Number(r.exRate).toLocaleString()}원
+            {r.reserve>0?` + ${fmt(r.reserve)}원(준비금)`:""}
+            {r.airfare>0?` + ${fmt(r.airfare)}원(항공권)`:""}
+            {" = "}<strong>{fmt(r.totalKRW)}원</strong>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Row({l,v,bold,large}){
+  return(
+    <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}>
+      <span style={{color:"#555"}}>{l}</span>
+      <span style={{fontWeight:bold?700:400,fontSize:large?15:13}}>{v}</span>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
