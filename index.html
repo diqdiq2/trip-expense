@@ -162,7 +162,7 @@ function App() {
         const adj=t.dayAdj[dt]||{};
         const di2=adj.rental?base.daily*0.5:base.daily;
         const mealCount = adj.meal2 ? 2 : (adj.meal ? 1 : 0);
-        const mi = mealCount===2 ? base.meal*0.7*0.7 : mealCount===1 ? base.meal*0.7 : base.meal;
+        const mi = mealCount===2 ? base.meal*0.4 : mealCount===1 ? base.meal*0.7 : base.meal;
         totalD+=di2;totalM+=mi;
         return{date:dt,rental:!!adj.rental,mealCount,daily:di2,meal:mi};
       });
@@ -285,10 +285,10 @@ function App() {
               <input style={S.inp} value={city} onChange={e=>setCity(e.target.value)} placeholder="예: 도쿄, 뉴욕"/>
             </label>
             <label style={S.lbl}>출장 시작일 *
-              <input type="date" style={S.inp} value={startDate} onChange={e=>setStart(e.target.value)}/>
+              <input type="date" style={S.inp} value={startDate} onChange={e=>setStart(e.target.value)} min="1900-01-01" max="2099-12-31"/>
             </label>
             <label style={S.lbl}>출장 종료일 *
-              <input type="date" style={S.inp} value={endDate} onChange={e=>setEnd(e.target.value)}/>
+              <input type="date" style={S.inp} value={endDate} onChange={e=>setEnd(e.target.value)} min="1900-01-01" max="2099-12-31"/>
             </label>
           </div>
           <div style={{...S.g2,marginTop:12}}>
@@ -448,7 +448,7 @@ function TravelerCard({t,idx,dates,onUpdate,onDayAdj,onRemove,onCopyPrev}){
                           style={{border:"1px solid #d1d5db",borderRadius:5,padding:"3px 6px",fontSize:12}}>
                           <option value="0">없음</option>
                           <option value="1">1끼 (-30%)</option>
-                          <option value="2">2끼 (-51%)</option>
+                          <option value="2">2끼 (-60%)</option>
                         </select>
                       </td>
                     </tr>
@@ -555,7 +555,7 @@ function PersonResult({r}){
                     <td style={{...S.td,textAlign:"center"}}>{d.rental?"✅":"-"}</td>
                     <td style={{...S.td,textAlign:"center"}}>{d.mealCount===2?"2끼✅":d.mealCount===1?"1끼✅":"-"}</td>
                     <td style={{...S.td,textAlign:"right"}}>${fmtU(d.daily)}{d.rental&&<span style={{color:"#d97706",fontSize:10}}> (50%)</span>}</td>
-                    <td style={{...S.td,textAlign:"right"}}>${fmtU(d.meal)}{d.mealCount>0&&<span style={{color:"#d97706",fontSize:10}}> ({d.mealCount===2?"-51%":"-30%"})</span>}</td>
+                    <td style={{...S.td,textAlign:"right"}}>${fmtU(d.meal)}{d.mealCount>0&&<span style={{color:"#d97706",fontSize:10}}> ({d.mealCount===2?"-60%":"-30%"})</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -568,11 +568,11 @@ function PersonResult({r}){
             <Row l={`숙박비 합계 (${fmtU(r.discLodge)} × ${r.nights}박)`} v={`${fmtU(r.lodgeUSD)} = ${fmt(r.lodgeUSD*r.exRate)}원`}/>
             <div style={{borderTop:"1px solid #cbd5e1",margin:"6px 0"}}/>
             <Row l="USD 총계" v={`${fmtU(r.totalUSD)}`} bold/>
-            <Row l={`출장경비 소계 (× ${Number(r.exRate).toLocaleString()}원)`} v={`${fmtFloor10(r.tripKRW)}원 (십원 절사)`} bold/>
+            <Row l="출장경비 소계 (× ${Number(r.exRate).toLocaleString()}원)" v={`${fmtFloor10(r.tripKRW)}원 (십원 절사)`} bold/>
             {r.reserve>0&&<Row l="+ 준비금·업무추진비 등" v={`${fmt(r.reserve)}원`}/>}
             {r.airfare>0&&<Row l="+ 항공권" v={`${fmt(r.airfare)}원`}/>}
             <div style={{borderTop:"2px solid #1e3a5f",margin:"6px 0"}}/>
-            <Row l="최종 지급액" v={`${fmtFloor10(r.totalKRW)}원`} bold large/>
+            <Row l="최종 지급액" v={`${fmt(r.totalKRW)}원`} bold large/>
           </div>
           <div style={{marginTop:10,padding:"8px 12px",background:"#fffbeb",borderRadius:8,fontSize:12,color:"#92400e",lineHeight:1.9}}>
             <strong>계산식:</strong><br/>
