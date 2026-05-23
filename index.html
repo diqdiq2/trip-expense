@@ -568,7 +568,7 @@ function PersonResult({r}){
             <Row l={`숙박비 합계 (${fmtU(r.discLodge)} × ${r.nights}박)`} v={`${fmtU(r.lodgeUSD)} = ${fmt(r.lodgeUSD*r.exRate)}원`}/>
             <div style={{borderTop:"1px solid #cbd5e1",margin:"6px 0"}}/>
             <Row l="USD 총계" v={`${fmtU(r.totalUSD)}`} bold/>
-            <Row l="출장경비 소계 (× ${Number(r.exRate).toLocaleString()}원)" v={`${fmtFloor10(r.tripKRW)}원 (십원 절사)`} bold/>
+            <Row l="출장경비 소계 (× ${Number(r.exRate).toLocaleString()}원)" v={`${fmtFloor10(r.tripKRW)}원 (10원 미만 절사)`} bold/>
             {r.reserve>0&&<Row l="+ 준비금·업무추진비 등" v={`${fmt(r.reserve)}원`}/>}
             {r.airfare>0&&<Row l="+ 항공권" v={`${fmt(r.airfare)}원`}/>}
             <div style={{borderTop:"2px solid #1e3a5f",margin:"6px 0"}}/>
