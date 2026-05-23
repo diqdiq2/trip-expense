@@ -211,7 +211,7 @@ function App() {
       rows.push([q("최종 지급액(원)"),q(fmt(r.totalKRW))]);
       rows.push([]);
     });
-    const grand=res.reduce((s,r)=>s+r.totalKRW,0);
+    const grand=res.reduce((s,r)=>s+Math.floor(r.totalKRW/10)*10,0);
     rows.push([q("▶ 전체 합계"),q(""),q(""),q("")]);
     rows.push([q("출장자"),q("직급"),q("직급군"),q("금액(원)")]);
     res.forEach(r=>rows.push([q(r.name),q(r.rank),q(r.rankGroup),q(fmt(r.totalKRW))]));
